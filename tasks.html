@@ -1,0 +1,102 @@
+
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+    <title>Тапсырмалар | Task Manager</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header>
+    <h1>✓ Task Manager</h1>
+    
+<nav>
+    <a href="index.html">Басты бет</a>
+    <a href="tasks.html">Менің тапсырмаларым</a>
+    <button type="button" id="logoutBtn">Шығу</button>
+</nav>
+
+</header>
+
+<main class="dashboard">
+
+    <div class="dashboard-heading">
+        <div>
+            <p class="eyebrow">МЕНІҢ ЖОСПАРЫМ</p>
+            <h2>Тапсырмаларым</h2>
+            <p>Күнделікті жұмыстарыңызды басқарыңыз.</p>
+        </div>
+    </div>
+
+    <section class="stats-grid">
+        <div class="stat-card">
+            <p>Барлық тапсырма</p>
+            <h3 id="totalCount">0</h3>
+        </div>
+
+        <div class="stat-card">
+            <p>Орындалмаған</p>
+            <h3 id="pendingCount">0</h3>
+        </div>
+
+        <div class="stat-card">
+            <p>Орындалған</p>
+            <h3 id="completedCount">0</h3>
+        </div>
+    </section>
+
+    <section class="task-panel">
+        <h3>Жаңа тапсырма қосу</h3>
+
+        <form id="taskForm" class="task-form">
+            <div class="form-group">
+                <label for="taskTitle">
+                    Тапсырма атауы
+                </label>
+                <input
+                    type="text"
+                    id="taskTitle"
+                    placeholder="Мысалы: PHP зертханасын орындау"
+                    required>
+            </div>
+
+            <div class="form-group">
+                <label for="taskDate">
+                    Орындау мерзімі
+                </label>
+                <input type="date" id="taskDate" required>
+            </div>
+
+            <button type="submit" class="primary-btn">
+                + Қосу
+            </button>
+        </form>
+    </section>
+
+    <section class="task-panel">
+        <h3>Тапсырмалар тізімі</h3>
+
+        <div class="filter-row">
+            <input
+                type="search"
+                id="searchTask"
+                placeholder="Тапсырманы іздеу...">
+
+            <select id="statusFilter">
+                <option value="all">Барлығы</option>
+                <option value="pending">Орындалмаған</option>
+                <option value="completed">Орындалған</option>
+            </select>
+        </div>
+
+        <div id="taskList" class="task-list"></div>
+    </section>
+
+</main>
+
+<script src="js/main.js"></script>
+</body>
+</html>

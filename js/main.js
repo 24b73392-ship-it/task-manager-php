@@ -1,146 +1,84 @@
 
 document.addEventListener("DOMContentLoaded", function () {
 
-    // 1. Демо жүйеге кіру күйін тексеру
-    const isLoggedIn =
-        sessionStorage.getItem("demoLoggedIn") === "true";
+    const dashboard = document.getElementById("taskDashboard");
 
-    const currentPage = window.location.pathname
-        .split("/")
-        .pop()
-        .toLowerCase();
+    // Тапсырмалар бетінде болмаса, код орындалмайды
+    if (!dashboard) return;
 
-    // Кірмеген пайдаланушы тапсырмаларға өте алмайды
-    if (currentPage === "tasks.html" && !isLoggedIn) {
-        window.location.replace("login.html");
-        return;
-    }
-
-    // 2. Тіркелу формасы
-    const registerForm = document.getElementById("registerForm");
-
-    if (registerForm) {
-        registerForm.addEventListener("submit", function (event) {
-            event.preventDefault();
-
-            const name = document.getElementById("name").value.trim();
-            const email = document.getElementById("email").value.trim();
-            const password = document.getElementById("password").value;
-            const confirmPassword =
-                document.getElementById("confirmPassword").value;
-
-            if (!name || !email || !password || !confirmPassword) {
-                alert("Барлық өрістерді толтырыңыз!");
-                return;
-            }
-
-            if (password.length < 6) {
-                alert("Құпиясөз кемінде 6 таңбадан тұруы керек!");
-                return;
-            }
-
-            if (password !== confirmPassword) {
-                alert("Құпиясөздер сәйкес келмейді!");
-                return;
-            }
-
-            // Бұл жерде аккаунт сақталмайды
-            alert("Тіркелу формасы дұрыс толтырылды! Бұл — демо.");
-            window.location.href = "login.html";
-        });
-    }
-
-    // 3. Кіру формасы
-    const loginForm = document.getElementById("loginForm");
-
-    if (loginForm) {
-        loginForm.addEventListener("submit", function (event) {
-            event.preventDefault();
-
-            const email =
-                document.getElementById("loginEmail").value.trim();
-
-            const password =
-                document.getElementById("loginPassword").value;
-
-            if (!email || !password) {
-                alert("Email және құпиясөзді енгізіңіз!");
-                return;
-            }
-
-            // 9-апта: тек демонстрациялық кіру
-            // Нақты аккаунтты тексеру 11-аптада жасалады
-            sessionStorage.setItem("demoLoggedIn", "true");
-
-            window.location.href = "tasks.html";
-        });
-    }
-
-    // 4. Аккаунттан шығу
-    const logoutBtn = document.getElementById("logoutBtn");
-
-    if (logoutBtn) {
-        logoutBtn.addEventListener("click", function () {
-            sessionStorage.removeItem("demoLoggedIn");
-            window.location.href = "login.html";
-        });
-    }
-
-    // 5. Тапсырмалар беті
     const taskForm = document.getElementById("taskForm");
-
-    if (!taskForm) {
-        return;
-    }
-
     const taskList = document.getElementById("taskList");
     const searchInput = document.getElementById("searchTask");
     const statusFilter = document.getElementById("statusFilter");
 
-    // Сақталған тапсырмаларды алу
+    // Әр демо email үшін бөлек сақтау кілті
+    const userEmail = dashboard.dataset.user;
+    const storageKey =
+        "taskmanager_demo_" + encodeURIComponent(userEmail);
+
     let tasks = [];
 
     try {
-        const savedTasks = JSON.parse(
-            localStorage.getItem("tasks")
-        );
-        tasks = Array.isArray(savedTasks) ? savedTasks : [];
+        const saved = JSON.parse(localStorage.getItem(storageKey));
+        tasks = Array.isArray(saved) ? saved : [];
     } catch (error) {
         tasks = [];
     }
 
-    // Тапсырмаларды браузерде сақтау
+    const colors = {
+        blue: "#3b82f6",
+        red: "#ef4444",
+        green: "#22c55e",
+        orange: "#f59e0b",
+        purple: "#8b5cf6"
+    };
+
+    const priorities = {
+        low: "Төмен",
+        medium: "Орташа",
+        high: "Жоғары"
+    };
+
     function saveTasks() {
-        localStorage.setItem("tasks", JSON.stringify(tasks));
+        localStorage.setItem(storageKey, JSON.stringify(tasks));
     }
 
-    // 6. Тапсырмаларды экранға шығару
     function renderTasks() {
         taskList.innerHTML = "";
 
-        const search = searchInput.value.toLowerCase().trim();
+        const query = searchInput.value.toLowerCase().trim();
         const filter = statusFilter.value;
 
         const filteredTasks = tasks.filter(function (task) {
-            const matchesSearch =
-                task.title.toLowerCase().includes(search);
+            const titleMatches =
+                task.title.toLowerCase().includes(query);
 
-            const matchesStatus =
+            const statusMatches =
                 filter === "all" || task.status === filter;
 
-            return matchesSearch && matchesStatus;
+            return titleMatches && statusMatches;
+        });
+
+        // Маңызды тапсырмалар бірінші шығады
+        filteredTasks.sort(function (a, b) {
+            if (a.flag && !b.flag) return -1;
+            if (!a.flag && b.flag) return 1;
+            return 0;
         });
 
         if (filteredTasks.length === 0) {
-            const emptyMessage = document.createElement("p");
-            emptyMessage.className = "empty-message";
-            emptyMessage.textContent = "Тапсырмалар табылмады";
-            taskList.appendChild(emptyMessage);
+            const empty = document.createElement("p");
+            empty.className = "empty-message";
+            empty.textContent = "Тапсырмалар табылмады";
+            taskList.appendChild(empty);
         }
 
         filteredTasks.forEach(function (task) {
             const item = document.createElement("div");
             item.className = "task-item";
+
+            const taskColor = colors[task.color] || colors.blue;
+            item.style.borderLeft = "5px solid " + taskColor;
 
             if (task.status === "completed") {
                 item.classList.add("completed");
@@ -149,49 +87,66 @@ document.addEventListener("DOMContentLoaded", function () {
             const info = document.createElement("div");
             info.className = "task-info";
 
+            const titleRow = document.createElement("div");
+            titleRow.className = "task-title-row";
+
             const title = document.createElement("h4");
             title.textContent = task.title;
+
+            titleRow.appendChild(title);
+
+            if (task.flag) {
+                const flag = document.createElement("span");
+                flag.className = "task-flag";
+                flag.textContent = "⚑";
+                flag.title = "Маңызды тапсырма";
+                titleRow.appendChild(flag);
+            }
 
             const date = document.createElement("p");
             date.textContent = "Мерзімі: " + task.date;
 
-            info.append(title, date);
+            const priority = document.createElement("span");
+            priority.className =
+                "priority-badge priority-" + (
+                    ["low", "medium", "high"].includes(task.priority)
+                        ? task.priority
+                        : "medium"
+                );
+
+            priority.textContent =
+                priorities[task.priority] || "Орташа";
+
+            info.append(titleRow, date, priority);
 
             const actions = document.createElement("div");
             actions.className = "task-actions";
 
-            // Орындалды / Қайтару
             const completeBtn = document.createElement("button");
             completeBtn.type = "button";
             completeBtn.className = "complete-btn";
-
             completeBtn.textContent =
                 task.status === "completed"
                     ? "Қайтару"
                     : "Орындалды";
 
             completeBtn.addEventListener("click", function () {
-                task.status =
-                    task.status === "completed"
-                        ? "pending"
-                        : "completed";
+                task.status = task.status === "completed"
+                    ? "pending"
+                    : "completed";
 
                 saveTasks();
                 renderTasks();
             });
 
-            // Жою батырмасы
             const deleteBtn = document.createElement("button");
             deleteBtn.type = "button";
             deleteBtn.className = "delete-btn";
             deleteBtn.textContent = "Жою";
 
             deleteBtn.addEventListener("click", function () {
-                if (confirm("Тапсырманы жоясыз ба?")) {
-                    tasks = tasks.filter(function (t) {
-                        return t.id !== task.id;
-                    });
-
+                if (window.confirm("Тапсырманы жоясыз ба?")) {
+                    tasks = tasks.filter(t => t.id !== task.id);
                     saveTasks();
                     renderTasks();
                 }
@@ -202,7 +157,6 @@ document.addEventListener("DOMContentLoaded", function () {
             taskList.appendChild(item);
         });
 
-        // Статистиканы жаңарту
         document.getElementById("totalCount").textContent =
             tasks.length;
 
@@ -213,7 +167,7 @@ document.addEventListener("DOMContentLoaded", function () {
             tasks.filter(t => t.status === "completed").length;
     }
 
-    // 7. Тапсырма қосу
+    // Жаңа тапсырма қосу
     taskForm.addEventListener("submit", function (event) {
         event.preventDefault();
 
@@ -223,8 +177,17 @@ document.addEventListener("DOMContentLoaded", function () {
         const date =
             document.getElementById("taskDate").value;
 
+        const priority =
+            document.getElementById("taskPriority").value;
+
+        const color =
+            document.getElementById("taskColor").value;
+
+        const flag =
+            document.getElementById("taskFlag").checked;
+
         if (!title || !date) {
-            alert("Барлық өрістерді толтырыңыз!");
+            alert("Атауы мен мерзімін толтырыңыз!");
             return;
         }
 
@@ -233,20 +196,20 @@ document.addEventListener("DOMContentLoaded", function () {
                 Math.random().toString(36).slice(2),
             title: title,
             date: date,
+            priority: priority,
+            color: color,
+            flag: flag,
             status: "pending"
         };
 
         tasks.push(newTask);
-
         saveTasks();
         renderTasks();
         taskForm.reset();
     });
 
-    // 8. Іздеу және сүзу
     searchInput.addEventListener("input", renderTasks);
     statusFilter.addEventListener("change", renderTasks);
 
-    // Алғашқы көрсету
     renderTasks();
 });

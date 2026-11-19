@@ -213,3 +213,24 @@ document.addEventListener("DOMContentLoaded", function () {
 
     renderTasks();
 });
+
+
+document.addEventListener("DOMContentLoaded", function () {
+
+    const deleteForms =
+        document.querySelectorAll(".delete-form");
+
+    deleteForms.forEach(function (form) {
+
+        form.addEventListener("submit", function (event) {
+
+            const answer = confirm(
+                "Бұл тапсырманы шынымен жоясыз ба?"
+            );
+
+            if (!answer) {
+                event.preventDefault();
+            }
+        });
+    });
+});

@@ -1,24 +1,58 @@
 
 <?php
-session_start();
+require_once __DIR__ . "/includes/auth.php";
+require_once __DIR__ . "/config/database.php";
+
+if (!empty($_SESSION["user_id"])) {
+    header("Location: tasks.php");
+    exit;
+}
 
 $pageTitle = "Кіру | Task Manager";
 $error = "";
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
+
     $email = trim($_POST["email"] ?? "");
     $password = $_POST["password"] ?? "";
 
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = "Email дұрыс енгізілмеген.";
-    } elseif ($password === "") {
-        $error = "Құпиясөзді енгізіңіз.";
-    } else {
-        session_regenerate_id(true);
-        $_SESSION["demo_user"] = $email;
+    if (!csrfValid()) {
+        $error = "Форманы жаңартып, қайта жіберіңіз.";
 
-        header("Location: tasks.php");
-        exit;
+    } elseif (
+        !filter_var($email, FILTER_VALIDATE_EMAIL)
+        || $password === ""
+    ) {
+        $error = "Email немесе құпиясөз дұрыс емес.";
+
+    } else {
+
+        $stmt = $pdo->prepare(
+            "SELECT id, name, email, password_hash
+             FROM users
+             WHERE email = ?"
+        );
+
+        $stmt->execute([$email]);
+        $user = $stmt->fetch();
+
+        if (
+            $user &&
+            password_verify($password, $user["password_hash"])
+        ) {
+
+            session_regenerate_id(true);
+
+            $_SESSION["user_id"] = (int) $user["id"];
+            $_SESSION["user_name"] = $user["name"];
+            $_SESSION["user_email"] = $user["email"];
+
+            header("Location: tasks.php");
+            exit;
+
+        } else {
+            $error = "Email немесе құпиясөз дұрыс емес.";
+        }
     }
 }
 
@@ -29,23 +63,32 @@ include __DIR__ . "/includes/header.php";
 
     <section class="auth-intro">
         <p class="eyebrow">TASK MANAGER</p>
+
         <h2>Қайтадан <span>қош келдіңіз!</span></h2>
 
         <p>
-            Жүйеге кіріп, тапсырмаларыңызды
-            басқаруды жалғастырыңыз.
+            Жеке аккаунтыңызға кіріп,
+            күнделікті тапсырмаларыңызды басқарыңыз.
         </p>
 
-        <div class="feature">✓ Жеке жұмыс аймағы</div>
-        <div class="feature">✓ Күнделікті жоспар</div>
+        <div class="feature">✓ Жеке профиль</div>
         <div class="feature">✓ Тапсырмаларды бақылау</div>
+        <div class="feature">✓ Уақытты тиімді жоспарлау</div>
     </section>
 
     <section class="auth-card">
+
         <h2>Жүйеге кіру</h2>
+
         <p class="subtitle">
-            Email және құпиясөз енгізіңіз.
+            Email және құпиясөзіңізді енгізіңіз.
         </p>
+
+        <?php if (isset($_GET["registered"])): ?>
+            <p class="form-success">
+                Тіркелу сәтті аяқталды! Енді кіріңіз.
+            </p>
+        <?php endif; ?>
 
         <?php if ($error): ?>
             <p class="form-error">
@@ -54,6 +97,15 @@ include __DIR__ . "/includes/header.php";
         <?php endif; ?>
 
         <form method="POST" action="login.php">
+
+            <input type="hidden"
+                   name="csrf_token"
+                   value="<?= htmlspecialchars(
+                       $_SESSION["csrf_token"],
+                       ENT_QUOTES,
+                       "UTF-8"
+                   ) ?>">
+
             <div class="form-group">
                 <label for="loginEmail">Email</label>
                 <input type="email"
@@ -79,6 +131,7 @@ include __DIR__ . "/includes/header.php";
             Аккаунтыңыз жоқ па?
             <a href="register.php">Тіркелу</a>
         </p>
+
     </section>
 </div>
 

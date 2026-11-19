@@ -1,28 +1,43 @@
 
 <?php
+require_once __DIR__ . "/includes/auth.php";
+require_once __DIR__ . "/config/database.php";
+
+if (!empty($_SESSION["user_id"])) {
+    header("Location: tasks.php");
+    exit;
+}
+
 $pageTitle = "Тіркелу | Task Manager";
 
 $errors = [];
-$success = "";
 $name = "";
 $email = "";
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
+
     $name = trim($_POST["name"] ?? "");
     $email = trim($_POST["email"] ?? "");
     $password = $_POST["password"] ?? "";
     $confirm = $_POST["confirmPassword"] ?? "";
 
-    if (mb_strlen($name) < 2) {
-        $errors[] = "Аты-жөні кемінде 2 таңба болуы керек.";
+    if (!csrfValid()) {
+        $errors[] = "Форманы жаңартып, қайта жіберіңіз.";
     }
 
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    if (mb_strlen($name) < 2 || mb_strlen($name) > 100) {
+        $errors[] = "Аты-жөні 2-100 таңба болуы керек.";
+    }
+
+    if (
+        !filter_var($email, FILTER_VALIDATE_EMAIL)
+        || strlen($email) > 190
+    ) {
         $errors[] = "Email дұрыс енгізілмеген.";
     }
 
-    if (strlen($password) < 6) {
-        $errors[] = "Құпиясөз кемінде 6 таңба болуы керек.";
+    if (strlen($password) < 8) {
+        $errors[] = "Құпиясөз кемінде 8 таңба болуы керек.";
     }
 
     if ($password !== $confirm) {
@@ -30,8 +45,42 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
 
     if (empty($errors)) {
-        $success = "Форма серверде сәтті тексерілді! "
-                 . "Аккаунт әлі сақталмайды.";
+
+        // Email бұрын тіркелген бе?
+        $stmt = $pdo->prepare(
+            "SELECT id FROM users WHERE email = ?"
+        );
+        $stmt->execute([$email]);
+
+        if ($stmt->fetch()) {
+            $errors[] = "Бұл email бұрын тіркелген.";
+        } else {
+
+            // Құпиясөзді хэштеу
+            $hash = password_hash(
+                $password,
+                PASSWORD_DEFAULT
+            );
+
+            try {
+                $stmt = $pdo->prepare(
+                    "INSERT INTO users (name, email, password_hash)
+                     VALUES (?, ?, ?)"
+                );
+
+                $stmt->execute([$name, $email, $hash]);
+
+                header("Location: login.php?registered=1");
+                exit;
+
+            } catch (PDOException $e) {
+                if ($e->getCode() === "23000") {
+                    $errors[] = "Бұл email бұрын тіркелген.";
+                } else {
+                    throw $e;
+                }
+            }
+        }
     }
 }
 
@@ -42,21 +91,25 @@ include __DIR__ . "/includes/header.php";
 
     <section class="auth-intro">
         <p class="eyebrow">TASK MANAGER</p>
+
         <h2>Жаңа аккаунт <span>құрыңыз</span></h2>
 
         <p>
-            Тапсырмаларыңызды жоспарлап,
-            күнделікті жұмысыңызды басқарыңыз.
+            Өз тапсырмаларыңызды жоспарлап,
+            күнделікті жұмысыңызды тиімді басқарыңыз.
         </p>
 
+        <div class="feature">✓ Жеке аккаунт</div>
         <div class="feature">✓ Тапсырмаларды жоспарлау</div>
         <div class="feature">✓ Орындалуын бақылау</div>
-        <div class="feature">✓ Уақытты тиімді пайдалану</div>
     </section>
 
     <section class="auth-card">
+
         <h2>Тіркелу</h2>
-        <p class="subtitle">Мәліметтеріңізді енгізіңіз.</p>
+        <p class="subtitle">
+            Жеке аккаунт ашу үшін мәлімет енгізіңіз.
+        </p>
 
         <?php foreach ($errors as $error): ?>
             <p class="form-error">
@@ -64,40 +117,50 @@ include __DIR__ . "/includes/header.php";
             </p>
         <?php endforeach; ?>
 
-        <?php if ($success): ?>
-            <p class="form-success">
-                <?= htmlspecialchars($success, ENT_QUOTES, "UTF-8") ?>
-            </p>
-        <?php endif; ?>
-
         <form method="POST" action="register.php">
+
+            <input type="hidden"
+                   name="csrf_token"
+                   value="<?= htmlspecialchars(
+                       $_SESSION["csrf_token"],
+                       ENT_QUOTES,
+                       "UTF-8"
+                   ) ?>">
 
             <div class="form-group">
                 <label for="name">Аты-жөні</label>
-                <input
-                    type="text"
-                    name="name"
-                    id="name"
-                    value="<?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8') ?>"
-                    required>
+                <input type="text"
+                       id="name"
+                       name="name"
+                       maxlength="100"
+                       value="<?= htmlspecialchars(
+                           $name,
+                           ENT_QUOTES,
+                           "UTF-8"
+                       ) ?>"
+                       required>
             </div>
 
             <div class="form-group">
                 <label for="email">Email</label>
-                <input
-                    type="email"
-                    name="email"
-                    id="email"
-                    value="<?= htmlspecialchars($email, ENT_QUOTES, 'UTF-8') ?>"
-                    required>
+                <input type="email"
+                       id="email"
+                       name="email"
+                       value="<?= htmlspecialchars(
+                           $email,
+                           ENT_QUOTES,
+                           "UTF-8"
+                       ) ?>"
+                       required>
             </div>
 
             <div class="form-group">
                 <label for="password">Құпиясөз</label>
                 <input type="password"
-                       name="password"
                        id="password"
-                       minlength="6" required>
+                       name="password"
+                       minlength="8"
+                       required>
             </div>
 
             <div class="form-group">
@@ -105,9 +168,10 @@ include __DIR__ . "/includes/header.php";
                     Құпиясөзді растау
                 </label>
                 <input type="password"
-                       name="confirmPassword"
                        id="confirmPassword"
-                       minlength="6" required>
+                       name="confirmPassword"
+                       minlength="8"
+                       required>
             </div>
 
             <button class="primary-btn" type="submit">
@@ -119,6 +183,7 @@ include __DIR__ . "/includes/header.php";
             Аккаунтыңыз бар ма?
             <a href="login.php">Кіру</a>
         </p>
+
     </section>
 </div>
 

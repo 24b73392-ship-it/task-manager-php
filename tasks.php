@@ -1,69 +1,140 @@
 
 <?php
-session_start();
+require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/config/database.php';
 
-if (empty($_SESSION["demo_user"])) {
-    header("Location: login.php");
+// Аккаунтқа кіргенін тексеру
+if (empty($_SESSION['user_id'])) {
+    header('Location: login.php');
     exit;
 }
 
-$pageTitle = "Менің тапсырмаларым | Task Manager";
-$email = $_SESSION["demo_user"];
+function h($value): string {
+    return htmlspecialchars(
+        (string)$value,
+        ENT_QUOTES | ENT_SUBSTITUTE,
+        'UTF-8'
+    );
+}
 
-include __DIR__ . "/includes/header.php";
+$userId = (int) $_SESSION['user_id'];
+$pageTitle = 'Менің тапсырмаларым | Task Manager';
+
+// READ: MySQL-дан өз тапсырмаларын оқу
+$stmt = $pdo->prepare(
+    'SELECT id, title, description, due_date,
+            status, priority, color, is_flagged
+     FROM tasks
+     WHERE user_id = ?
+     ORDER BY is_flagged DESC, id DESC'
+);
+
+$stmt->execute([$userId]);
+$tasks = $stmt->fetchAll();
+
+// Статистика
+$total = count($tasks);
+
+$completed = count(array_filter(
+    $tasks,
+    fn($t) => $t['status'] === 'completed'
+));
+
+$pending = $total - $completed;
+
+// Хабарламалар
+$message = $_SESSION['task_message'] ?? '';
+$error = $_SESSION['task_error'] ?? '';
+
+unset(
+    $_SESSION['task_message'],
+    $_SESSION['task_error']
+);
+
+$colorCodes = [
+    'blue' => '#3b82f6',
+    'red' => '#ef4444',
+    'green' => '#22c55e',
+    'orange' => '#f59e0b',
+    'purple' => '#8b5cf6'
+];
+
+$priorityLabels = [
+    'low' => 'Төмен',
+    'medium' => 'Орташа',
+    'high' => 'Жоғары'
+];
+
+include __DIR__ . '/includes/header.php';
 ?>
 
-<main class="dashboard"
-      id="taskDashboard"
-      data-user="<?= htmlspecialchars($email, ENT_QUOTES, 'UTF-8') ?>">
+<main class="dashboard">
 
     <div class="dashboard-heading">
-        <p class="eyebrow">ЖЕКЕ ЖҰМЫС АЙМАҒЫ</p>
+        <p class="eyebrow">МЕНІҢ ЖҰМЫС АЙМАҒЫМ</p>
         <h2>Менің тапсырмаларым</h2>
-        <p>
-            Тапсырмаларды жоспарлаңыз,
-            түс пен басымдық арқылы реттеңіз.
-        </p>
+        <p>Тапсырмаларыңыз MySQL дерекқорында сақталады.</p>
     </div>
+
+    <?php if ($message): ?>
+        <p class="form-success"><?= h($message) ?></p>
+    <?php endif; ?>
+
+    <?php if ($error): ?>
+        <p class="form-error"><?= h($error) ?></p>
+    <?php endif; ?>
 
     <section class="stats-grid">
         <div class="stat-card">
-            <p>Барлық тапсырма</p>
-            <h3 id="totalCount">0</h3>
+            <p>Барлығы</p>
+            <h3><?= $total ?></h3>
         </div>
+
         <div class="stat-card">
             <p>Орындалмаған</p>
-            <h3 id="pendingCount">0</h3>
+            <h3><?= $pending ?></h3>
         </div>
+
         <div class="stat-card">
             <p>Орындалған</p>
-            <h3 id="completedCount">0</h3>
+            <h3><?= $completed ?></h3>
         </div>
     </section>
 
     <section class="task-panel">
-        <h3>Жаңа тапсырма қосу</h3>
 
-        <form id="taskForm" class="task-form">
+        <h3>Жаңа тапсырма</h3>
+
+        <form method="POST"
+              action="task_action.php"
+              class="task-form">
+
+            <input type="hidden"
+                   name="csrf_token"
+                   value="<?= h($_SESSION['csrf_token']) ?>">
+
+            <input type="hidden" name="action" value="create">
 
             <div class="form-group">
-                <label for="taskTitle">Тапсырма атауы</label>
-                <input
-                    type="text"
-                    id="taskTitle"
-                    maxlength="100"
-                    placeholder="Мысалы: PHP зертханасы"
-                    required>
+                <label for="title">Тапсырма атауы</label>
+                <input id="title"
+                       name="title"
+                       maxlength="150"
+                       required
+                       placeholder="Мысалы: PHP зертханасын орындау">
             </div>
 
             <div class="form-group">
-                <label for="taskDate">Мерзімі</label>
-                <input type="date" id="taskDate" required>
+                <label for="due_date">Мерзімі</label>
+                <input id="due_date"
+                       type="date"
+                       name="due_date">
             </div>
 
             <div class="form-group">
-                <label for="taskPriority">Басымдық</label>
-                <select id="taskPriority">
+                <label for="priority">Басымдық</label>
+
+                <select id="priority" name="priority">
                     <option value="low">Төмен</option>
                     <option value="medium" selected>Орташа</option>
                     <option value="high">Жоғары</option>
@@ -71,8 +142,9 @@ include __DIR__ . "/includes/header.php";
             </div>
 
             <div class="form-group">
-                <label for="taskColor">Түсі</label>
-                <select id="taskColor">
+                <label for="color">Түсі</label>
+
+                <select id="color" name="color">
                     <option value="blue">Көк</option>
                     <option value="red">Қызыл</option>
                     <option value="green">Жасыл</option>
@@ -81,36 +153,129 @@ include __DIR__ . "/includes/header.php";
                 </select>
             </div>
 
+            <div class="form-group wide-field">
+                <label for="description">Сипаттама</label>
+
+                <textarea id="description"
+                          name="description"
+                          maxlength="2000"
+                          rows="3"></textarea>
+            </div>
+
             <label class="flag-checkbox">
-                <input type="checkbox" id="taskFlag">
+                <input type="checkbox"
+                       name="is_flagged"
+                       value="1">
                 ⚑ Маңызды тапсырма
             </label>
 
-            <button class="primary-btn" type="submit">
+            <button type="submit" class="primary-btn">
                 + Тапсырма қосу
             </button>
+
         </form>
     </section>
 
     <section class="task-panel">
+
         <h3>Тапсырмалар тізімі</h3>
 
-        <div class="filter-row">
-            <input
-                type="search"
-                id="searchTask"
-                placeholder="Тапсырманы іздеу...">
+        <?php if (!$tasks): ?>
+            <p class="empty-message">
+                Әзірге тапсырма жоқ. Жоғарыдағы формадан қосыңыз.
+            </p>
+        <?php endif; ?>
 
-            <select id="statusFilter">
-                <option value="all">Барлығы</option>
-                <option value="pending">Орындалмаған</option>
-                <option value="completed">Орындалған</option>
-            </select>
+        <div class="task-list">
+
+        <?php foreach ($tasks as $task): ?>
+
+            <article
+                class="task-item <?= $task['status'] === 'completed' ? 'completed' : '' ?>"
+                style="border-left: 5px solid <?= h($colorCodes[$task['color']] ?? $colorCodes['blue']) ?>">
+
+                <div class="task-info">
+
+                    <div class="task-title-row">
+                        <h4><?= h($task['title']) ?></h4>
+
+                        <?php if ($task['is_flagged']): ?>
+                            <span class="task-flag"
+                                  title="Маңызды">⚑</span>
+                        <?php endif; ?>
+                    </div>
+
+                    <p>
+                        Мерзімі:
+                        <?= h($task['due_date'] ?: 'Көрсетілмеген') ?>
+                    </p>
+
+                    <?php if ($task['description']): ?>
+                        <p><?= nl2br(h($task['description'])) ?></p>
+                    <?php endif; ?>
+
+                    <span class="priority-badge priority-<?= h($task['priority']) ?>">
+                        <?= h($priorityLabels[$task['priority']] ?? 'Орташа') ?>
+                    </span>
+
+                </div>
+
+                <div class="task-actions">
+
+                    <form method="POST" action="task_action.php">
+                        <input type="hidden"
+                               name="csrf_token"
+                               value="<?= h($_SESSION['csrf_token']) ?>">
+
+                        <input type="hidden"
+                               name="action"
+                               value="toggle">
+
+                        <input type="hidden"
+                               name="task_id"
+                               value="<?= (int)$task['id'] ?>">
+
+                        <button type="submit" class="complete-btn">
+                            <?= $task['status'] === 'completed'
+                                ? 'Қайтару'
+                                : 'Орындалды' ?>
+                        </button>
+                    </form>
+
+                    <a class="edit-btn"
+                       href="edit_task.php?id=<?= (int)$task['id'] ?>">
+                        Өңдеу
+                    </a>
+
+                    <form method="POST"
+                          action="task_action.php"
+                          class="delete-form">
+
+                        <input type="hidden"
+                               name="csrf_token"
+                               value="<?= h($_SESSION['csrf_token']) ?>">
+
+                        <input type="hidden"
+                               name="action"
+                               value="delete">
+
+                        <input type="hidden"
+                               name="task_id"
+                               value="<?= (int)$task['id'] ?>">
+
+                        <button type="submit" class="delete-btn">
+                            Жою
+                        </button>
+                    </form>
+
+                </div>
+            </article>
+
+        <?php endforeach; ?>
+
         </div>
-
-        <div id="taskList" class="task-list"></div>
     </section>
 
 </main>
 
-<?php include __DIR__ . "/includes/footer.php"; ?>
+<?php include __DIR__ . '/includes/footer.php'; ?>

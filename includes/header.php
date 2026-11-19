@@ -1,11 +1,9 @@
 
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+require_once __DIR__ . "/auth.php";
 
 $pageTitle = $pageTitle ?? "Task Manager";
-$isLoggedIn = !empty($_SESSION["demo_user"]);
+$isLoggedIn = !empty($_SESSION["user_id"]);
 ?>
 
 <!DOCTYPE html>
@@ -24,6 +22,7 @@ $isLoggedIn = !empty($_SESSION["demo_user"]);
 <body>
 
 <header class="site-header">
+
     <a href="index.php" class="site-logo">
         <span class="logo-icon">✓</span>
         Task Manager
@@ -37,9 +36,21 @@ $isLoggedIn = !empty($_SESSION["demo_user"]);
             <a href="tasks.php">Менің тапсырмаларым</a>
             <a href="profile.php">Профиль</a>
 
-            <a href="logout.php" class="nav-logout">
-                Шығу
-            </a>
+            <form action="logout.php" method="POST"
+                  class="logout-form">
+
+                <input type="hidden"
+                       name="csrf_token"
+                       value="<?= htmlspecialchars(
+                           $_SESSION["csrf_token"],
+                           ENT_QUOTES,
+                           "UTF-8"
+                       ) ?>">
+
+                <button type="submit" class="nav-logout">
+                    Шығу
+                </button>
+            </form>
 
         <?php else: ?>
 
@@ -51,4 +62,5 @@ $isLoggedIn = !empty($_SESSION["demo_user"]);
 
         <?php endif; ?>
     </nav>
+
 </header>

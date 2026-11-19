@@ -1,10 +1,30 @@
-
 <?php
 $pageTitle = "Басты бет | Task Manager";
+
+$section = $_GET["section"] ?? "home";
+
+if (!in_array($section, ["home", "features"], true)) {
+    $section = "home";
+}
+
 include __DIR__ . "/includes/header.php";
 ?>
 
+
 <main class="landing-page">
+
+    
+<div class="get-demo">
+    <a href="index.php?section=home">Басты бет</a>
+    <a href="index.php?section=features">Мүмкіндіктер</a>
+
+    <?php if ($section === "features"): ?>
+        <p>GET нәтижесі: сайттың мүмкіндіктері таңдалды.</p>
+    <?php else: ?>
+        <p>GET нәтижесі: басты бет таңдалды.</p>
+    <?php endif; ?>
+</div>
+
 
     <section class="hero">
         <div class="hero-content">
